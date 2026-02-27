@@ -327,6 +327,9 @@ async def main():
     """主程序入口 - 交互式对话"""
 
     print("=" * 60)
+    print()
+    print(f"{Colors.YELLOW}[OpenAI Agents SDK]{Colors.RESET}")
+    print()
     print("模型信息：")
     print(f"{BASE_URL=}, {MODEL_NAME=}")
     print()

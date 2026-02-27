@@ -1,11 +1,14 @@
 """
-多智能体识别准确性测试脚本
+多智能体识别准确性测试脚本 - AgentScope实现
 测试主调度智能体能否准确路由到正确的专业智能体
 """
 
 import asyncio
-from agents import Runner
-from air_compressor_station_agents import main_agent
+import time
+
+from agentscope_multi_agents import main_agent, sub_agent_memory
+from agentscope.message import Msg
+from test_cases import TEST_CASES
 
 
 # ==================== 颜色定义 ====================
@@ -18,103 +21,16 @@ class TestColors:
     CYAN = '\033[96m'    # 信息
     RESET = '\033[0m'    # 重置
 
+# ==================== 辅助函数 ====================
 
-# ==================== 测试用例定义 ====================
-
-TEST_CASES = [
-    # dispatch_agent 测试用例 (4个)
-    {
-        "question": "如何启动1号空压机？",
-        "expected_agent": "dispatch_agent"
-    },
-    {
-        "question": "停止3号空压机运行",
-        "expected_agent": "dispatch_agent"
-    },
-    {
-        "question": "将2号空压机负荷调整到80%",
-        "expected_agent": "dispatch_agent"
-    },
-    {
-        "question": "当前用气需求是多少？",
-        "expected_agent": "dispatch_agent"
-    },
-
-    # maintenance_agent 测试用例 (3个)
-    {
-        "question": "1号空压机出现异常振动，怎么诊断故障？",
-        "expected_agent": "maintenance_agent"
-    },
-    {
-        "question": "温度过高怎么维修？需要什么步骤？",
-        "expected_agent": "maintenance_agent"
-    },
-    {
-        "question": "订购5个轴承备件",
-        "expected_agent": "maintenance_agent"
-    },
-
-    # energy_analysis_agent 测试用例 (3个)
-    {
-        "question": "分析本月的能耗数据",
-        "expected_agent": "energy_analysis_agent"
-    },
-    {
-        "question": "对比1号和2号空压机的能效",
-        "expected_agent": "energy_analysis_agent"
-    },
-    {
-        "question": "生成节能分析报告",
-        "expected_agent": "energy_analysis_agent"
-    },
-
-    # health_agent 测试用例 (3个)
-    {
-        "question": "查询1号空压机的健康评分",
-        "expected_agent": "health_agent"
-    },
-    {
-        "question": "预测2号空压机的维护需求",
-        "expected_agent": "health_agent"
-    },
-    {
-        "question": "获取3号空压机的实时运行状态",
-        "expected_agent": "health_agent"
-    },
-
-    # report_agent 测试用例 (4个)
-    {
-        "question": "生成今天的运营日报",
-        "expected_agent": "report_agent"
-    },
-    {
-        "question": "生成本月的运营月报",
-        "expected_agent": "report_agent"
-    },
-    {
-        "question": "提供一些优化建议",
-        "expected_agent": "report_agent"
-    },
-    {
-        "question": "分析当前运营状况并给出建议",
-        "expected_agent": "report_agent"
-    },
-
-    # inspection_agent 测试用例 (3个)
-    {
-        "question": "对1号空压机进行视觉巡检",
-        "expected_agent": "inspection_agent"
-    },
-    {
-        "question": "対2号空压机进行巡检，检测是否有异常",
-        "expected_agent": "inspection_agent"
-    },
-    {
-        "question": "记录3号空压机的巡检结果：设备正常",
-        "expected_agent": "inspection_agent"
-    },
-]
-
+async def get_joined_agent_name() -> str:
+    """从响应中提取智能体名称"""
+    sub_agent_mem = await sub_agent_memory.get_memory()
+    for msg_item in reversed(sub_agent_mem):
+        if msg_item.name in ["user", "system"]:
+            continue
+        return msg_item.name
+    return "main_agent"
 
 # ==================== 测试执行函数 ====================
 
@@ -133,20 +49,14 @@ async def execute_single_test(test_case: dict, index: int) -> dict:
     expected = test_case["expected_agent"]
 
     try:
-        # 使用会话保持上下文
-        from agents import SQLiteSession
-        session = SQLiteSession(
-            session_id="recognition_test",
-            db_path="./sessions/recognition_test.db"
-        )
-        # 调用智能体
-        result = await Runner.run(
-            main_agent,
-            input=question,
-            session=session
-        )
 
-        actual = result.last_agent.name
+        # 调用智能体
+        msg = Msg(name="user", content=question, role="user")
+        response = await main_agent(msg)
+
+
+        # 提取智能体名称
+        actual = await get_joined_agent_name()
         is_correct = actual == expected
 
         return {
@@ -220,7 +130,6 @@ def print_summary(results: list):
     print(f"正确：{correct}")
     print(f"错误：{errors}")
     print(f"准确率：{accuracy:.2f}%")
-    print()
 
     # 显示错误详情
     if error_cases:
@@ -230,13 +139,11 @@ def print_summary(results: list):
                   f"实际 {case['actual']}")
         print()
 
-    print("测试完成！")
-
 
 async def run_tests():
     """运行所有测试"""
     print("=" * 60)
-    print("多智能体识别准确性测试")
+    print("多智能体识别准确性测试 - AgentScope")
     print("=" * 60)
     print(f"测试用例数：{len(TEST_CASES)}")
     print(f"开始执行测试...")
@@ -245,13 +152,20 @@ async def run_tests():
     results = []
 
     # 逐个执行测试
+    # 记录开始时间
+    start_time = time.time()
     for index, test_case in enumerate(TEST_CASES, start=1):
         result = await execute_single_test(test_case, index)
         results.append(result)
         print_test_result(result)
+    # 记录结束时间
+    end_time = time.time()
 
     # 打印摘要
     print_summary(results)
+    # 计算耗时
+    elapsed_time = end_time - start_time
+    print(f"程序执行耗时: {elapsed_time:.2f} 秒")
 
     return results
 
