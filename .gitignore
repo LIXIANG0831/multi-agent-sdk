@@ -7,6 +7,7 @@ Icon
 .Spotlight-V100
 .Trashes
 Thumbs.db
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
