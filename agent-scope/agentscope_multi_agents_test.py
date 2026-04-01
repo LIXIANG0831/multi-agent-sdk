@@ -110,6 +110,14 @@ def print_test_result(result: dict):
     print()  # 空行分隔
 
 
+def print_intermediate_accuracy(results: list, count: int):
+    """打印中间准确率"""
+    correct = sum(1 for r in results if r["is_correct"])
+    accuracy = (correct / count * 100) if count > 0 else 0
+    print(f"[已完成 {count} 题] 当前准确率: {accuracy:.2f}% ({correct}/{count})")
+    print()
+
+
 def print_summary(results: list):
     """打印测试摘要"""
     total = len(results)
@@ -158,6 +166,11 @@ async def run_tests():
         result = await execute_single_test(test_case, index)
         results.append(result)
         print_test_result(result)
+
+        # 每完成10个问题打印一次准确率
+        if index % 10 == 0:
+            print_intermediate_accuracy(results, index)
+
     # 记录结束时间
     end_time = time.time()
 
